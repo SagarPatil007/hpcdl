@@ -1,0 +1,580 @@
+// https://pastebin.com/KTq8wtaR
+
+// practical 1 :
+ 
+ 
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <omp.h>
+ 
+using namespace std;
+ 
+// Graph class representing the adjacency list
+class Graph {
+    int V;  // Number of vertices
+    vector<vector<int>> adj;  // Adjacency list     
+ 
+public:
+    Graph(int V) : V(V), adj(V) {}
+ 
+    // Add an edge to the graph
+    void addEdge(int v, int w) {
+        adj[v].push_back(w);
+    }
+ 
+    // Parallel Depth-First Search
+    void parallelDFS(int startVertex) {
+        vector<bool> visited(V, false);
+        parallelDFSUtil(startVertex, visited);
+    }
+ 
+    // Parallel DFS utility function
+    void parallelDFSUtil(int v, vector<bool>& visited) {
+        visited[v] = true;
+        cout << v << " ";
+ 
+        #pragma omp parallel for
+        for (int i = 0; i < adj[v].size(); ++i) {
+            int n = adj[v][i];
+            if (!visited[n])
+                parallelDFSUtil(n, visited);
+        }
+    }
+ 
+    // Parallel Breadth-First Search
+    void parallelBFS(int startVertex) {
+        vector<bool> visited(V, false);
+        queue<int> q;
+ 
+        visited[startVertex] = true;
+        q.push(startVertex);
+ 
+        while (!q.empty()) {
+            int v = q.front();
+            q.pop();
+            cout << v << " ";
+ 
+            #pragma omp parallel for
+            for (int i = 0; i < adj[v].size(); ++i) {
+                int n = adj[v][i];
+                if (!visited[n]) {
+                    visited[n] = true;
+                    q.push(n);
+                }
+            }
+        }
+    }
+};
+ 
+int main() {
+    // Create a graph
+    Graph g(7);
+    g.addEdge(0, 1);
+    g.addEdge(0, 2);
+    g.addEdge(1, 3);
+    g.addEdge(1, 4);
+    g.addEdge(2, 5);
+    g.addEdge(2, 6); 
+ 
+ 
+    cout << "Depth-First Search (DFS): ";
+    g.parallelDFS(0);
+    cout << endl;
+ 
+    cout << "Breadth-First Search (BFS): ";
+    g.parallelBFS(0);
+    cout << endl;
+ 
+    return 0;
+}
+ 
+// practical : 2
+ 
+ 
+#include <iostream>
+#include <ctime>
+#include <cstdlib>
+#include <omp.h>
+ 
+using namespace std;
+ 
+void bubbleSort(int arr[], int n)
+{
+    for (int i = 0; i < n - 1; ++i)
+    {
+        for (int j = 0; j < n - i - 1; ++j)
+        {
+            if (arr[j] > arr[j + 1])
+            {
+                swap(arr[j], arr[j + 1]);
+            }
+        }
+    }
+}
+ 
+void merge(int arr[], int l, int m, int r)
+{
+    int i, j, k;
+    int n1 = m - l + 1;
+    int n2 = r - m;
+ 
+    int *L = new int[n1];
+    int *R = new int[n2];
+ 
+    for (i = 0; i < n1; ++i)
+    {
+        L[i] = arr[l + i];
+    }
+    for (j = 0; j < n2; ++j)
+    {
+        R[j] = arr[m + 1 + j];
+    }
+ 
+    i = 0;
+    j = 0;
+    k = l;
+ 
+    while (i < n1 && j < n2)
+    {
+        if (L[i] <= R[j])
+        {
+            arr[k] = L[i];
+            ++i;
+        }
+        else
+        {
+            arr[k] = R[j];
+            ++j;
+        }
+        ++k;
+    }
+ 
+    while (i < n1)
+    {
+        arr[k] = L[i];
+        ++i;
+        ++k;
+    }
+ 
+    while (j < n2)
+    {
+        arr[k] = R[j];
+        ++j;
+        ++k;
+    }
+ 
+    delete[] L;
+    delete[] R;
+}
+ 
+void mergeSort(int arr[], int l, int r)
+{
+    if (l < r)
+    {
+        int m = l + (r - l) / 2;
+        #pragma omp parallel sections
+        {
+            #pragma omp section
+            {
+                mergeSort(arr, l, m);
+            }
+            #pragma omp section
+            {
+                mergeSort(arr, m + 1, r);
+            }
+        }
+ 
+        merge(arr, l, m, r);
+    }
+}
+ 
+void printArray(int arr[], int size)
+{
+    for (int i = 0; i < size; ++i)
+    {
+        cout << arr[i] << " ";
+    }
+    cout << endl;
+}
+ 
+int main()
+{
+    int n;
+    cout << "Enter the size of the array: ";
+    cin >> n;
+ 
+    int *arr = new int[n];
+    srand(time(0));
+    for (int i = 0; i < n; ++i)
+    {
+        arr[i] = rand() % 100;
+    }
+ 
+    // cout << "Original array: ";
+    // printArray(arr, n);
+ 
+    // Sequential Bubble Sort
+    clock_t start = clock();
+    bubbleSort(arr, n);
+    clock_t end = clock();
+ 
+    // cout << "Sequential Bubble Sorted array: ";
+    // printArray(arr, n);
+ 
+    double sequentialBubbleTime = double(end - start) / CLOCKS_PER_SEC;
+ 
+    // Parallel Bubble Sort
+    start = clock();
+    #pragma omp parallel
+    {
+        bubbleSort(arr, n);
+    }
+    end = clock();
+ 
+    // cout << "Parallel Bubble Sorted array: ";
+    // printArray(arr, n);
+ 
+    double parallelBubbleTime = double(end - start) / CLOCKS_PER_SEC;
+ 
+    // Merge Sort
+    start = clock();
+    mergeSort(arr, 0, n - 1);
+    end = clock();
+ 
+    // cout << "Sequential Merge Sorted array: ";
+    // printArray(arr, n);
+ 
+    double sequentialMergeTime = double(end - start) / CLOCKS_PER_SEC;
+ 
+    // Parallel Merge Sort
+    start = clock();
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            mergeSort(arr, 0, n - 1);
+        }
+    }
+    end = clock();
+ 
+    // cout << "Parallel Merge Sorted array: ";
+    // printArray(arr, n);
+ 
+    double parallelMergeTime = double(end - start) / CLOCKS_PER_SEC;
+ 
+    // Performance measurement
+    cout << "Sequential Bubble Sort Time: " << sequentialBubbleTime << " seconds" << endl;
+    cout << "Parallel Bubble Sort Time: " << parallelBubbleTime << " seconds" << endl;
+    cout << "Sequential Merge Sort Time: " << sequentialMergeTime << " seconds" << endl;
+    cout << "Parallel Merge Sort Time: " << parallelMergeTime << " seconds" << endl;
+ 
+    delete[] arr;
+ 
+    return 0;
+}
+ 
+ 
+// practical : 3
+ 
+/*
+  Windows does not support user defined reductions.
+  This program may not run on MVSC++ compilers for Windows.
+  Please use Linux Environment.[You can try using "windows subsystem for linux"]
+*/
+ 
+#include<iostream>
+#include<omp.h>
+using namespace std;
+ 
+int minval(int arr[], int n){
+  int minval = arr[0];
+  #pragma omp parallel for reduction(min : minval)
+    for(int i = 0; i < n; i++){
+      if(arr[i] < minval) minval = arr[i];
+    }
+  return minval;
+}
+ 
+int maxval(int arr[], int n){
+  int maxval = arr[0];
+  #pragma omp parallel for reduction(max : maxval)
+    for(int i = 0; i < n; i++){
+      if(arr[i] > maxval) maxval = arr[i];
+    }
+  return maxval;
+}
+ 
+int sum(int arr[], int n){
+  int sum = 0;
+  #pragma omp parallel for reduction(+ : sum)
+    for(int i = 0; i < n; i++){
+      sum += arr[i];
+    }
+  return sum;
+}
+ 
+int average(int arr[], int n){
+  return (double)sum(arr, n) / n;
+}
+ 
+int main(){
+  int n = 5;
+  int arr[] = {1,2,3,4,5};
+  cout << "The minimum value is: " << minval(arr, n) << '\n';
+  cout << "The maximum value is: " << maxval(arr, n) << '\n';
+  cout << "The summation is: " << sum(arr, n) << '\n';
+  cout << "The average is: " << average(arr, n) << '\n';
+  return 0;
+}
+ 
+ 
+// practical : 4
+ 
+ 
+//4.1 MartrixMul
+ 
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+ 
+#define checkCudaErrors(call)                                                                 \
+    do {                                                                                      \
+        cudaError_t err = call;                                                               \
+        if (err != cudaSuccess) {                                                             \
+            printf("CUDA error at %s %d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+            exit(EXIT_FAILURE);                                                               \
+        }                                                                                     \
+    } while (0)
+ 
+using namespace std;
+ 
+// Matrix multiplication Cuda
+__global__ void matrixMultiplication(int *a, int *b, int *c, int n) {
+    int row = threadIdx.y + blockDim.y * blockIdx.y;
+    int col = threadIdx.x + blockDim.x * blockIdx.x;
+    int sum = 0;
+ 
+    if (row < n && col < n)
+        for (int j = 0; j < n; j++) {
+            sum = sum + a[row * n + j] * b[j * n + col];
+        }
+ 
+    c[n * row + col] = sum;
+}
+ 
+int main() {
+    int *a, *b, *c;
+    int *a_dev, *b_dev, *c_dev;
+    int n = 10;
+ 
+    a = new int[n * n];
+    b = new int[n * n];
+    c = new int[n * n];
+    int *d = new int[n * n];
+    int size = n * n * sizeof(int);
+    checkCudaErrors(cudaMalloc(&a_dev, size));
+    checkCudaErrors(cudaMalloc(&b_dev, size));
+    checkCudaErrors(cudaMalloc(&c_dev, size));
+ 
+    // Array initialization
+    for (int i = 0; i < n * n; i++) {
+        a[i] = rand() % 10;
+        b[i] = rand() % 10;
+    }
+ 
+    cout << "Given matrix A is =>\n";
+    for (int row = 0; row < n; row++) {
+        for (int col = 0; col < n; col++) {
+            cout << a[row * n + col] << " ";
+        }
+        cout << "\n";
+    }
+    cout << "\n";
+ 
+    cout << "Given matrix B is =>\n";
+    for (int row = 0; row < n; row++) {
+        for (int col = 0; col < n; col++) {
+            cout << b[row * n + col] << " ";
+        }
+        cout << "\n";
+    }
+    cout << "\n";
+ 
+    cudaEvent_t start, end;
+ 
+    checkCudaErrors(cudaEventCreate(&start));
+    checkCudaErrors(cudaEventCreate(&end));
+ 
+    checkCudaErrors(cudaMemcpy(a_dev, a, size, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(b_dev, b, size, cudaMemcpyHostToDevice));
+ 
+    dim3 threadsPerBlock(n, n);
+    dim3 blocksPerGrid(1, 1);
+ 
+    // GPU Multiplication
+    checkCudaErrors(cudaEventRecord(start));
+    matrixMultiplication<<<blocksPerGrid, threadsPerBlock>>>(a_dev, b_dev, c_dev, n);
+ 
+    checkCudaErrors(cudaEventRecord(end));
+    checkCudaErrors(cudaEventSynchronize(end));
+ 
+    float time = 0.0;
+    checkCudaErrors(cudaEventElapsedTime(&time, start, end));
+ 
+    checkCudaErrors(cudaMemcpy(c, c_dev, size, cudaMemcpyDeviceToHost));
+ 
+    // CPU matrix multiplication
+    int sum = 0;
+    for (int row = 0; row < n; row++) {
+        for (int col = 0; col < n; col++) {
+            sum = 0;
+            for (int k = 0; k < n; k++) sum = sum + a[row * n + k] * b[k * n + col];
+            d[row * n + col] = sum;
+        }
+    }
+ 
+    cout << "CPU product is =>\n";
+    for (int row = 0; row < n; row++) {
+        for (int col = 0; col < n; col++) {
+            cout << d[row * n + col] << " ";
+        }
+        cout << "\n";
+    }
+    cout << "\n";
+ 
+    cout << "GPU product is =>\n";
+    for (int row = 0; row < n; row++) {
+        for (int col = 0; col < n; col++) {
+            cout << c[row * n + col] << " ";
+        }
+        cout << "\n";
+    }
+    cout << "\n";
+ 
+    int error = 0;
+    int _c, _d;
+    for (int row = 0; row < n; row++) {
+        for (int col = 0; col < n; col++) {
+            _c = c[row * n + col];
+            _d = d[row * n + col];
+            error += _c - _d;
+            if (0 != (_c - _d)) {
+                cout << "Error at (" << row << ", " << col << ") => GPU: " << _c << ", CPU: " << _d
+                     << "\n";
+            }
+        }
+    }
+    cout << "\n";
+ 
+    cout << "Error : " << error;
+    cout << "\nTime Elapsed: " << time;
+ 
+    return 0;
+}
+ 
+//4.2 VectorAdd
+ 
+#include <cstdlib>
+#include <iostream>
+ 
+#define checkCudaErrors(call)                                                                 \
+    do {                                                                                      \
+        cudaError_t err = call;                                                               \
+        if (err != cudaSuccess) {                                                             \
+            printf("CUDA error at %s %d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+            exit(EXIT_FAILURE);                                                               \
+        }                                                                                     \
+    } while (0)
+ 
+using namespace std;
+ 
+// VectorAdd parallel function
+__global__ void vectorAdd(int *a, int *b, int *result, int n) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    if (tid < n) {
+        result[tid] = a[tid] + b[tid];
+    }
+}
+ 
+int main() {
+    int *a, *b, *c;
+    int *a_dev, *b_dev, *c_dev;
+    int n = 1 << 4;
+ 
+    a = new int[n];
+    b = new int[n];
+    c = new int[n];
+    int *d = new int[n];
+    int size = n * sizeof(int);
+    checkCudaErrors(cudaMalloc(&a_dev, size));
+    checkCudaErrors(cudaMalloc(&b_dev, size));
+    checkCudaErrors(cudaMalloc(&c_dev, size));
+ 
+    // Array initialization..You can use Randon function to assign values
+    for (int i = 0; i < n; i++) {
+        a[i] = rand() % 1000;
+        b[i] = rand() % 1000;
+        d[i] = a[i] + b[i];  // calculating serial addition
+    }
+    cout << "Given array A is =>\n";
+    for (int i = 0; i < n; i++) {
+        cout << a[i] << ", ";
+    }
+    cout << "\n\n";
+ 
+    cout << "Given array B is =>\n";
+    for (int i = 0; i < n; i++) {
+        cout << b[i] << ", ";
+    }
+    cout << "\n\n";
+ 
+    cudaEvent_t start, end;
+ 
+    checkCudaErrors(cudaEventCreate(&start));
+    checkCudaErrors(cudaEventCreate(&end));
+ 
+    checkCudaErrors(cudaMemcpy(a_dev, a, size, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemcpy(b_dev, b, size, cudaMemcpyHostToDevice));
+    int threads = 1024;
+    int blocks = (n + threads - 1) / threads;
+    checkCudaErrors(cudaEventRecord(start));
+ 
+    // Parallel addition program
+    vectorAdd<<<blocks, threads>>>(a_dev, b_dev, c_dev, n);
+ 
+    checkCudaErrors(cudaEventRecord(end));
+    checkCudaErrors(cudaEventSynchronize(end));
+ 
+    float time = 0.0;
+    checkCudaErrors(cudaEventElapsedTime(&time, start, end));
+ 
+    checkCudaErrors(cudaMemcpy(c, c_dev, size, cudaMemcpyDeviceToHost));
+ 
+    // Calculate the error term.
+ 
+    cout << "CPU sum is =>\n";
+    for (int i = 0; i < n; i++) {
+        cout << d[i] << ", ";
+    }
+    cout << "\n\n";
+ 
+    cout << "GPU sum is =>\n";
+    for (int i = 0; i < n; i++) {
+        cout << c[i] << ", ";
+    }
+    cout << "\n\n";
+ 
+    int error = 0;
+    for (int i = 0; i < n; i++) {
+        error += d[i] - c[i];
+        if (0 != (d[i] - c[i])) {
+            cout << "Error at (" << i << ") => GPU: " << c[i] << ", CPU: " << d[i] << "\n";
+        }
+    }
+ 
+    cout << "\nError : " << error;
+    cout << "\nTime Elapsed: " << time;
+ 
+    return 0;
+}
